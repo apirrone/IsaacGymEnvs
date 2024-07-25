@@ -53,46 +53,9 @@ class MotionLib(object):
     def get_motion(self, motion_id):
         return self._motions[motion_id]
 
-    def sample_motions(self, n, commands) -> torch.Tensor:
-        # Need to find a way to sample the good motion when using fetch_amp_obs_demo
-        # Where n is of size amp_batch_size (512), but there are only num_envs commands
-        # For now, sample randomly
-        if True or len(self._dataset_name_to_id) == 1:  # Warning True
-            m = self.num_motions()
-            motion_ids = np.random.choice(
-                m, size=n, replace=True, p=self._motion_weights
-            )
-        else:
-            # dataset_ids = ["bdx_stand", "bdx_walk_forward", "bdx_walk_forward_right", "bdx_walk_forward_left", "bdx_walk_backward"]
-            motion_ids = []
-            print("num envs", n)
-            for i in range(n):
-                command_x = commands[i % n, 0]  # BAD
-                command_y = commands[i % n, 1]
-                command_yaw = commands[i % n, 2]
-
-                if (
-                    abs(command_x) < 0.01
-                    and abs(command_y) < 0.01
-                    and abs(command_yaw) < 0.01
-                ):
-                    motion_ids.append(self._dataset_name_to_id["bdx_stand"])
-                elif command_x > 0.01:
-                    if abs(command_y) < 0.01:
-                        motion_ids.append(self._dataset_name_to_id["bdx_walk_forward"])
-                    elif command_y > 0.01:
-                        motion_ids.append(
-                            self._dataset_name_to_id["bdx_walk_forward_right"]
-                        )
-                    else:
-                        motion_ids.append(
-                            self._dataset_name_to_id["bdx_walk_forward_left"]
-                        )
-                elif command_x < -0.01:
-                    motion_ids.append(self._dataset_name_to_id["bdx_walk_backward"])
-
-            motion_ids = torch.Tensor(motion_ids).long().to(self._device)
-
+    def sample_motions(self, n) -> torch.Tensor:
+        m = self.num_motions()
+        motion_ids = np.random.choice(m, size=n, replace=True, p=self._motion_weights)
         return motion_ids
 
     def sample_time(self, motion_ids, truncate_time=None):

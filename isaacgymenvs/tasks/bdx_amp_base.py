@@ -164,6 +164,39 @@ class BdxAMPBase(VecTask):
         self.commands_x = self.commands.view(self.num_envs, 3)[..., 0]
         self.commands_yaw = self.commands.view(self.num_envs, 3)[..., 2]
 
+        self.motion_ids = None
+
+        self.command_ranges = {}
+        self.command_ranges["bdx_walk_forward"] = {}
+        self.command_ranges["bdx_walk_forward"]["x"] = [0.0, 0.02]
+        self.command_ranges["bdx_walk_forward"]["y"] = [0.0, 0.0]
+        self.command_ranges["bdx_walk_forward"]["yaw"] = [0.0, 0.0]
+
+        self.command_ranges["bdx_walk_backward"] = {}
+        self.command_ranges["bdx_walk_backward"]["x"] = [-0.02, 0.0]
+        self.command_ranges["bdx_walk_backward"]["y"] = [0.0, 0.0]
+        self.command_ranges["bdx_walk_backward"]["yaw"] = [0.0, 0.0]
+
+        self.command_ranges["bdx_walk_left"] = {}
+        self.command_ranges["bdx_walk_left"]["x"] = [0.0, 0.0]
+        self.command_ranges["bdx_walk_left"]["y"] = [0.0, 0.02]
+        self.command_ranges["bdx_walk_left"]["yaw"] = [0.0, 0.0]
+
+        self.command_ranges["bdx_walk_right"] = {}
+        self.command_ranges["bdx_walk_right"]["x"] = [0.0, 0.0]
+        self.command_ranges["bdx_walk_right"]["y"] = [-0.02, 0.0]
+        self.command_ranges["bdx_walk_right"]["yaw"] = [0.0, 0.0]
+
+        self.command_ranges["bdx_turn_left"] = {}
+        self.command_ranges["bdx_turn_left"]["x"] = [0.0, 0.0]
+        self.command_ranges["bdx_turn_left"]["y"] = [0.0, 0.0]
+        self.command_ranges["bdx_turn_left"]["yaw"] = [0.0, 0.05]
+
+        self.command_ranges["bdx_turn_right"] = {}
+        self.command_ranges["bdx_turn_right"]["x"] = [0.0, 0.0]
+        self.command_ranges["bdx_turn_right"]["y"] = [0.0, 0.0]
+        self.command_ranges["bdx_turn_right"]["yaw"] = [-0.05, 0.0]
+
         self.default_dof_pos = torch.zeros_like(
             self.dof_pos, dtype=torch.float, device=self.device, requires_grad=False
         )
@@ -440,6 +473,8 @@ class BdxAMPBase(VecTask):
             self._update_debug_viz()
 
     def compute_reward(self, actions):
+        # print(self.motion_ids)
+
         self.rew_buf[:] = compute_bdx_reward(
             self.root_states,
             self.commands,
@@ -508,26 +543,34 @@ class BdxAMPBase(VecTask):
             pickle.dump(self.saved_obs, open("saved_obs.pkl", "wb"))
 
     def reset_idx(self, env_ids):
-        self.commands_x[env_ids] = torch_rand_float(
-            self.command_x_range[0],
-            self.command_x_range[1],
-            (len(env_ids), 1),
-            device=self.device,
-        ).squeeze()
-        self.commands_y[env_ids] = torch_rand_float(
-            self.command_y_range[0],
-            self.command_y_range[1],
-            (len(env_ids), 1),
-            device=self.device,
-        ).squeeze()
-        self.commands_yaw[env_ids] = torch_rand_float(
-            self.command_yaw_range[0],
-            self.command_yaw_range[1],
-            (len(env_ids), 1),
-            device=self.device,
-        ).squeeze()
-
         self._reset_actors(env_ids)
+
+        # generate relevant commands depending on the choosen motion file
+        for i in range(len(env_ids)):
+            env_id = env_ids[i]
+            motion_file = self._motion_lib._motion_files[self.motion_ids[i]]
+            motion_name = motion_file.split("/")[-1].split(".")[0]
+            command_range = self.command_ranges[motion_name]
+
+            self.commands_x[env_id] = torch_rand_float(
+                command_range["x"][0],
+                command_range["x"][1],
+                (len([env_id]), 1),
+                device=self.device,
+            ).squeeze()
+            self.commands_y[env_id] = torch_rand_float(
+                command_range["y"][0],
+                command_range["y"][1],
+                (len([env_id]), 1),
+                device=self.device,
+            ).squeeze()
+            self.commands_yaw[env_id] = torch_rand_float(
+                command_range["yaw"][0],
+                command_range["yaw"][1],
+                (len([env_id]), 1),
+                device=self.device,
+            ).squeeze()
+
         self.compute_observations(env_ids)
 
     def _reset_actors(self, env_ids):
