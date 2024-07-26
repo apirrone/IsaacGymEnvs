@@ -68,7 +68,6 @@ class BdxAMPBase(VecTask):
         ]
         self.rew_scales["torque"] = self.cfg["env"]["learn"]["torqueRewardScale"]
 
-        self._pd_control = self.cfg["env"]["pdControl"]
         self.power_scale = self.cfg["env"]["powerScale"]
         self.randomize = self.cfg["task"]["randomize"]
         self.randomization_params = self.cfg["task"]["randomization_params"]
@@ -133,6 +132,28 @@ class BdxAMPBase(VecTask):
         self._local_root_obs = self.cfg["env"]["localRootObs"]
         self._termination_height = self.cfg["env"]["terminationHeight"]
         self._enable_early_termination = self.cfg["env"]["enableEarlyTermination"]
+
+        # == custom pd control ===
+        self._pd_control = self.cfg["env"]["pdControl"]
+        self._kP = self.cfg["env"]["control"]["kP"]
+        self._kD = self.cfg["env"]["control"]["kD"]
+        self.p_gain = (
+            torch.ones(
+                (self.num_envs, self.num_dof),
+                device=self.device,
+                dtype=torch.float,
+            )
+            * self._kP
+        )
+        self.d_gain = (
+            torch.ones(
+                (self.num_envs, self.num_dof),
+                device=self.device,
+                dtype=torch.float,
+            )
+            * self._kD
+        )
+        # == custom pd control ===
 
         # get gym state tensors
         actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
@@ -266,7 +287,7 @@ class BdxAMPBase(VecTask):
         asset_options.flip_visual_attachments = False
         asset_options.fix_base_link = self.cfg["env"]["urdfAsset"]["fixBaseLink"]
         asset_options.density = 0.001
-        asset_options.angular_damping = 0.0
+        asset_options.angular_damping = 0.1
         asset_options.linear_damping = 0.0
         asset_options.armature = 0.0
         asset_options.thickness = 0.01
@@ -310,30 +331,30 @@ class BdxAMPBase(VecTask):
 
         self.dof_limits_lower = []
         self.dof_limits_upper = []
-        # for i in range(self.num_dof):
-        #     dof_props["driveMode"][i] = gymapi.DOF_MODE_NONE
-        #     dof_props["stiffness"][i] = 0
-        #     dof_props["damping"][i] = 0
-        #     if dof_props["lower"][i] > dof_props["upper"][i]:
-        #         self.dof_limits_lower.append(dof_props["upper"][i])
-        #         self.dof_limits_upper.append(dof_props["lower"][i])
-        #     else:
-        #         self.dof_limits_lower.append(dof_props["lower"][i])
-        #         self.dof_limits_upper.append(dof_props["upper"][i])
-
-        # Previously
         for i in range(self.num_dof):
-            dof_props["driveMode"][i] = gymapi.DOF_MODE_POS
-            dof_props["stiffness"][i] = self.cfg["env"]["control"][
-                "stiffness"
-            ]  # self.Kp
-            dof_props["damping"][i] = self.cfg["env"]["control"]["damping"]  # self.Kd
+            dof_props["driveMode"][i] = gymapi.DOF_MODE_NONE
+            dof_props["stiffness"][i] = 0
+            dof_props["damping"][i] = 0
             if dof_props["lower"][i] > dof_props["upper"][i]:
                 self.dof_limits_lower.append(dof_props["upper"][i])
                 self.dof_limits_upper.append(dof_props["lower"][i])
             else:
                 self.dof_limits_lower.append(dof_props["lower"][i])
                 self.dof_limits_upper.append(dof_props["upper"][i])
+
+        # Previously
+        # for i in range(self.num_dof):
+        #     dof_props["driveMode"][i] = gymapi.DOF_MODE_POS
+        #     dof_props["stiffness"][i] = self.cfg["env"]["control"][
+        #         "stiffness"
+        #     ]  # self.Kp
+        #     dof_props["damping"][i] = self.cfg["env"]["control"]["damping"]  # self.Kd
+        #     if dof_props["lower"][i] > dof_props["upper"][i]:
+        #         self.dof_limits_lower.append(dof_props["upper"][i])
+        #         self.dof_limits_upper.append(dof_props["lower"][i])
+        #     else:
+        #         self.dof_limits_lower.append(dof_props["lower"][i])
+        #         self.dof_limits_upper.append(dof_props["upper"][i])
 
         self.dof_limits_lower = to_torch(self.dof_limits_lower, device=self.device)
         self.dof_limits_upper = to_torch(self.dof_limits_upper, device=self.device)
@@ -373,41 +394,32 @@ class BdxAMPBase(VecTask):
         )
 
     def pre_physics_step(self, actions):
-        self.actions = actions.to(self.device).clone()
-        # self.actions = torch.zeros(
-        #     self.num_envs,
-        #     self.num_actions,
-        #     dtype=torch.float,
-        #     device=self.device,
-        #     requires_grad=False,
-        # )
+        # self.actions = actions.to(self.device).clone()
+        self.actions = torch.zeros(
+            self.num_envs,
+            self.num_actions,
+            dtype=torch.float,
+            device=self.device,
+            requires_grad=False,
+        )
         if self.debug_save_obs_actions:
             self.saved_actions.append((self.actions[0].cpu().numpy(), time.time()))
             pickle.dump(self.saved_actions, open("saved_actions.pkl", "wb"))
 
         if self._pd_control:
-            # target = self._action_to_pd_targets(self.actions) + self.default_dof_pos
-            # self.torques = (
-            #     self.Kp * (pd_tar - self.dof_pos)
-            #     - self.Kd * self.dof_vel  # * self.dof_vel_scale
-            # )
-            # self.torques = torch.clip(
-            #     self.torques, -0.6, 0.6
-            # )  # TODO find more restrictive limits based on the walk generator
-            # self.gym.set_dof_actuation_force_tensor(
-            #     self.sim, gymtorch.unwrap_tensor(self.torques)
-            # )
+            self.gym.refresh_dof_state_tensor(self.sim)
+            self.gym.refresh_actor_root_state_tensor(self.sim)
+            self.gym.refresh_rigid_body_state_tensor(self.sim)
+            self.gym.refresh_net_contact_force_tensor(self.sim)
 
-            # pd_target = self._action_to_pd_targets(self.actions) + self.default_dof_pos
-            # pd_target = self.default_dof_pos
-            # pd_target = (
-            #     self.default_dof_pos
-            #     + np.sin(5 * self.common_step_counter * self.dt) * 0.5
-            # )
-            # pd_target = self.actions
             target = self.default_dof_pos + self.actions
-            target_tensor = gymtorch.unwrap_tensor(target)
-            self.gym.set_dof_position_target_tensor(self.sim, target_tensor)
+            torques = self.p_gain * (target - self.dof_pos) - self.d_gain * self.dof_vel
+
+            torques = torch.clip(torques, -0.52, 0.52)
+            self.gym.set_dof_actuation_force_tensor(
+                self.sim, gymtorch.unwrap_tensor(torques)
+            )
+
         else:
             forces = self.actions * self.motor_efforts.unsqueeze(0) * self.power_scale
             force_tensor = gymtorch.unwrap_tensor(forces)

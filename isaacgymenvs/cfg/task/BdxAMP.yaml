@@ -39,7 +39,8 @@ env:
     restitution: 0. # [-]
 
   baseInitState:
-    pos: [0.0, 0.0, 0.175] # x,y,z [m]
+    pos: [0.0, 0.0, 0.3] # x,y,z [m]
+    # pos: [0.0, 0.0, 0.175] # x,y,z [m]
     rot: [0.0, 0.0, 0.0, 1.0] # x,y,z,w [quat]
     vLinear: [0.0, 0.0, 0.0] # x,y,z [m/s]
     vAngular: [0.0, 0.0, 0.0] # x,y,z [rad/s]
@@ -59,8 +60,9 @@ env:
     # PD Drive parameters:
     stiffness: 5 # [N*m/rad] 
     damping: 0.01 # [N*m*s/rad]
-    # Replaced manual actionScale with automatic action scale calculated from URDF
-    # actionScale: 2.0
+    
+    kP: 10
+    kD: 0
     controlFrequencyInv: 1 # 60 Hz
 
   defaultJointAngles: # = target angles when action = 0.0
@@ -99,8 +101,8 @@ env:
 
   urdfAsset:
     collapseFixedJoints: True
-    fixBaseLink: False
-    defaultDofDriveMode: 1 # see GymDofDriveModeFlags (0 is none, 1 is pos tgt, 2 is vel tgt, 4 effort)
+    fixBaseLink: True
+    defaultDofDriveMode: 0 # see GymDofDriveModeFlags (0 is none, 1 is pos tgt, 2 is vel tgt, 4 effort)
 
   learn:
     # normalization
