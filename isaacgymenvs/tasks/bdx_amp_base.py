@@ -212,19 +212,42 @@ class BdxAMPBase(VecTask):
         if self.viewer != None:
             self._init_camera()
 
-        # _imu_tensor = self.gym.acquire_force_sensor_tensor(self.sim)
-        # self.gym.refresh_force_sensor_tensor(self.sim)
-        # # self.imu_indices = torch.tensor(
-        # #     [3, 4, 5], device=self.device, requires_grad=False
-        # # )
-        # self.imu_indices = torch.tensor(
-        #     [0, 1, 2], device=self.device, requires_grad=False
-        # )  # TODO what indices ?
-        # self.imu_tensor = gymtorch.wrap_tensor(_imu_tensor)
-        #
         if self.debug_save_obs_actions:
             self.saved_obs = []
             self.saved_actions = []
+
+        self.motion_ids = None
+
+        self.command_ranges = {}
+        self.command_ranges["bdx_walk_forward"] = {}
+        self.command_ranges["bdx_walk_forward"]["x"] = [0.1, 0.1]
+        self.command_ranges["bdx_walk_forward"]["y"] = [0.0, 0.0]
+        self.command_ranges["bdx_walk_forward"]["yaw"] = [0.0, 0.0]
+
+        self.command_ranges["bdx_walk_backward"] = {}
+        self.command_ranges["bdx_walk_backward"]["x"] = [-0.1, -0.1]
+        self.command_ranges["bdx_walk_backward"]["y"] = [0.0, 0.0]
+        self.command_ranges["bdx_walk_backward"]["yaw"] = [0.0, 0.0]
+
+        self.command_ranges["bdx_side_left"] = {}
+        self.command_ranges["bdx_side_left"]["x"] = [0.0, 0.0]
+        self.command_ranges["bdx_side_left"]["y"] = [0.1, 0.1]
+        self.command_ranges["bdx_side_left"]["yaw"] = [0.0, 0.0]
+
+        self.command_ranges["bdx_side_right"] = {}
+        self.command_ranges["bdx_side_right"]["x"] = [0.0, 0.0]
+        self.command_ranges["bdx_side_right"]["y"] = [-0.1, -0.1]
+        self.command_ranges["bdx_side_right"]["yaw"] = [0.0, 0.0]
+
+        self.command_ranges["bdx_turn_left"] = {}
+        self.command_ranges["bdx_turn_left"]["x"] = [0.0, 0.0]
+        self.command_ranges["bdx_turn_left"]["y"] = [0.0, 0.0]
+        self.command_ranges["bdx_turn_left"]["yaw"] = [0.1, 0.1]
+
+        self.command_ranges["bdx_turn_right"] = {}
+        self.command_ranges["bdx_turn_right"]["x"] = [0.0, 0.0]
+        self.command_ranges["bdx_turn_right"]["y"] = [0.0, 0.0]
+        self.command_ranges["bdx_turn_right"]["yaw"] = [-0.1, -0.1]
 
     def create_sim(self):
         self.up_axis_idx = 2  # index of up axis: Y=1, Z=2
@@ -491,26 +514,34 @@ class BdxAMPBase(VecTask):
             pickle.dump(self.saved_obs, open("saved_obs.pkl", "wb"))
 
     def reset_idx(self, env_ids):
-        self.commands_x[env_ids] = torch_rand_float(
-            self.command_x_range[0],
-            self.command_x_range[1],
-            (len(env_ids), 1),
-            device=self.device,
-        ).squeeze()
-        self.commands_y[env_ids] = torch_rand_float(
-            self.command_y_range[0],
-            self.command_y_range[1],
-            (len(env_ids), 1),
-            device=self.device,
-        ).squeeze()
-        self.commands_yaw[env_ids] = torch_rand_float(
-            self.command_yaw_range[0],
-            self.command_yaw_range[1],
-            (len(env_ids), 1),
-            device=self.device,
-        ).squeeze()
-
         self._reset_actors(env_ids)
+
+        # generate relevant commands depending on the choosen motion file
+        for i in range(len(env_ids)):
+            env_id = env_ids[i]
+            motion_file = self._motion_lib._motion_files[self.motion_ids[i]]
+            motion_name = motion_file.split("/")[-1].split(".")[0]
+            command_range = self.command_ranges[motion_name]
+
+            self.commands_x[env_id] = torch_rand_float(
+                command_range["x"][0],
+                command_range["x"][1],
+                (len([env_id]), 1),
+                device=self.device,
+            ).squeeze()
+            self.commands_y[env_id] = torch_rand_float(
+                command_range["y"][0],
+                command_range["y"][1],
+                (len([env_id]), 1),
+                device=self.device,
+            ).squeeze()
+            self.commands_yaw[env_id] = torch_rand_float(
+                command_range["yaw"][0],
+                command_range["yaw"][1],
+                (len([env_id]), 1),
+                device=self.device,
+            ).squeeze()
+
         self.compute_observations(env_ids)
 
     def _reset_actors(self, env_ids):

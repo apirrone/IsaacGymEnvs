@@ -132,7 +132,7 @@ class BdxAMP(BdxAMPBase):
 
     def fetch_amp_obs_demo(self, num_samples):
         dt = self.dt
-        motion_ids = self._motion_lib.sample_motions(num_samples, self.commands)
+        motion_ids = self._motion_lib.sample_motions(num_samples)
 
         if self._amp_obs_demo_buf is None:
             self._build_amp_obs_demo_buf(num_samples)
@@ -241,13 +241,13 @@ class BdxAMP(BdxAMPBase):
         For each env, a reference motion is selected and used to initialize the robot state.
         """
         num_envs = env_ids.shape[0]
-        motion_ids = self._motion_lib.sample_motions(num_envs, self.commands)
+        self.motion_ids = self._motion_lib.sample_motions(num_envs)
 
         if (
             self._state_init == BdxAMP.StateInit.Random
             or self._state_init == BdxAMP.StateInit.Hybrid
         ):
-            motion_times = self._motion_lib.sample_time(motion_ids)
+            motion_times = self._motion_lib.sample_time(self.motion_ids)
         elif self._state_init == BdxAMP.StateInit.Start:
             motion_times = np.zeros(num_envs)
         else:
@@ -263,7 +263,7 @@ class BdxAMP(BdxAMPBase):
             root_ang_vel,
             dof_vel,
         ) = self._motion_lib.get_motion_state(
-            motion_ids, motion_times, random_z_rot=self._random_z_rot
+            self.motion_ids, motion_times, random_z_rot=self._random_z_rot
         )
         # Set root pos to begin at same position
         root_pos[:, :3] = self.initial_root_states[env_ids, :3]
@@ -279,7 +279,7 @@ class BdxAMP(BdxAMPBase):
         )
 
         self._reset_ref_env_ids = env_ids
-        self._reset_ref_motion_ids = motion_ids
+        self._reset_ref_motion_ids = self.motion_ids
         self._reset_ref_motion_times = motion_times
         return
 

@@ -1,13 +1,13 @@
 motions:
-  - file: "placo_moves/bdx_walk_forward.txt"
+  - file: "mujoco_moves/bdx_walk_forward.txt"
     weight: 0.1667
-  - file: "placo_moves/bdx_walk_backward.txt"
+  - file: "mujoco_moves/bdx_walk_backward.txt"
     weight: 0.1667
-  - file: "placo_moves/bdx_turn_left.txt"
+  - file: "mujoco_moves/bdx_turn_left.txt"
     weight: 0.1667
-  - file: "placo_moves/bdx_turn_right.txt"
+  - file: "mujoco_moves/bdx_turn_right.txt"
     weight: 0.1667
-  - file: "placo_moves/bdx_walk_left.txt"
+  - file: "mujoco_moves/bdx_side_left.txt"
     weight: 0.1667
-  - file: "placo_moves/bdx_walk_right.txt"
+  - file: "mujoco_moves/bdx_side_right.txt"
     weight: 0.1667

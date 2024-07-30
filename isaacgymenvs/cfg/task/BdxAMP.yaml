@@ -8,7 +8,8 @@ env:
   # motionFile: "data/motions/bdx/placo_moves/higher_bdx_walk_forward.txt"
   # motionFile: "data/motions/bdx/mujoco_moves/bdx_walk_forward.txt"
   # motionFile: "data/motions/bdx/mujoco_moves/bdx_stand.txt"
-  motionFile: "data/motions/bdx/mujoco_moves/bdx_walk_in_place.txt"
+  # motionFile: "data/motions/bdx/mujoco_moves/bdx_walk_in_place.txt"
+  motionFile: "data/motions/bdx/dataset_bdx.yaml"
 
   # End AMP-specific things
   # numEnvs: ${resolve_default:4096,${...num_envs}}
